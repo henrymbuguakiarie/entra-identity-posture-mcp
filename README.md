@@ -63,51 +63,128 @@ flowchart LR
 - A Microsoft Entra ID app registration configured with a **certificate credential** (client secrets are not supported by `auth.py`)
 - Admin-consented Microsoft Graph **application** permissions: `Application.Read.All` and `Policy.Read.All`
 
-### Prerequisite: create the Entra app registration (manual, one-time)
+## 1. Clone the repository
 
-This server does not automate app registration or admin consent — set these up yourself:
+```bash
+git clone https://github.com/henrymbuguakiarie/entra-identity-posture-mcp.git
+cd entra-identity-posture-mcp
+```
 
-1. In the [Entra admin center](https://entra.microsoft.com), create a new **App registration**.
-2. Under **Certificates & secrets**, upload a certificate (`.pem`/`.cer`) and note its thumbprint. Keep the matching private key file locally — never commit it (see [.gitignore](.gitignore)).
-3. Under **API permissions**, add Microsoft Graph **Application permissions**: `Application.Read.All` and `Policy.Read.All`, then click **Grant admin consent**.
-4. Note the **Tenant ID** and **Application (client) ID** from the app registration's Overview page.
+## 2. Install dependencies
 
-## Installation
-
-Using [uv](https://docs.astral.sh/uv/) (recommended):
+Install with [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
 uv sync
 ```
 
-Using pip:
+Or install with pip:
 
 ```bash
 pip install -e .
 ```
 
-For development (includes test and lint tooling):
+Include test and lint tooling for development:
 
 ```bash
 uv sync --group dev
 ```
 
-## Configuration
+## 3. Create the Entra app registration and certificate credential
 
-The server authenticates to Microsoft Graph via [MSAL](https://learn.microsoft.com/entra/msal/python/) certificate-based confidential client auth. Copy [.env.example](.env.example) to `.env` and fill in your values:
+Authenticate the server with a **certificate**, not a client secret — `auth.py` only supports MSAL's certificate-based confidential client flow. Complete these steps once, manually; the server does not automate app registration or admin consent.
 
-| Variable                   | Description                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------ |
-| `ENTRA_TENANT_ID`          | Your Microsoft Entra tenant ID                                                       |
-| `ENTRA_CLIENT_ID`          | Application (client) ID of your app registration                                     |
-| `ENTRA_CERT_PATH`          | Path to the PEM-encoded private key for the app's certificate credential             |
-| `ENTRA_CERT_THUMBPRINT`    | Thumbprint of the certificate uploaded to the app registration                       |
-| `IMMINENT_EXPIRATION_DAYS` | Days-until-expiry threshold for the `IMMINENT_EXPIRATION` rule (default `30`)        |
-| `EXCESSIVE_LIFESPAN_DAYS`  | Max credential lifespan in days before flagging `EXCESSIVE_LIFESPAN` (default `180`) |
+### 3.1 Register the app
 
-## Usage
+1. Open the [Entra admin center](https://entra.microsoft.com) and go to **Identity → Applications → App registrations**.
+2. Select **New registration**, name it (e.g. `entra-identity-posture-mcp`), keep the default single-tenant account type, and select **Register**.
+3. Copy the **Application (client) ID** and **Directory (tenant) ID** from the app's **Overview** page — you'll need both for `.env`.
 
-Run the MCP server directly (stdio transport):
+### 3.2 Generate a certificate
+
+Generate the certificate on the machine that will run the server, so the private key never leaves your workstation.
+
+**Windows (PowerShell):**
+
+```powershell
+# Generate a self-signed certificate and store it in your user certificate store
+$cert = New-SelfSignedCertificate `
+  -Subject "CN=entra-identity-posture-mcp" `
+  -CertStoreLocation "Cert:\CurrentUser\My" `
+  -KeyExportPolicy Exportable `
+  -KeySpec Signature `
+  -KeyLength 2048 `
+  -NotAfter (Get-Date).AddYears(1)
+
+# Export the public certificate to upload to Entra
+Export-Certificate -Cert $cert -FilePath "$HOME\entra-mcp-cert.cer"
+
+# Export the private key as a password-protected PFX
+$securePwd = Read-Host -Prompt "Set a temporary PFX password" -AsSecureString
+Export-PfxCertificate -Cert $cert -FilePath "$HOME\entra-mcp-cert.pfx" -Password $securePwd
+```
+
+Convert the PFX to the PEM private key format `auth.py` expects — this requires [OpenSSL](https://openssl.org/), which ships with Git for Windows at `C:\Program Files\Git\mingw64\bin\openssl.exe`:
+
+```bash
+openssl pkcs12 -in ~/entra-mcp-cert.pfx -nocerts -nodes -out ~/entra-mcp-cert.key.pem
+```
+
+Delete the PFX once you have the PEM file — you no longer need it:
+
+```powershell
+Remove-Item "$HOME\entra-mcp-cert.pfx" -Force
+```
+
+**macOS/Linux (OpenSSL, cross-platform):**
+
+```bash
+# Generate a private key and matching self-signed public certificate in one step
+openssl req -x509 -newkey rsa:2048 -keyout entra-mcp-cert.key.pem -out entra-mcp-cert.cer \
+  -days 365 -nodes -subj "/CN=entra-identity-posture-mcp"
+```
+
+Either path produces two files:
+
+- `entra-mcp-cert.cer` — the **public** certificate. Upload this one to Entra.
+- `entra-mcp-cert.key.pem` — the **private** key. Keep this file local and never commit it (see [.gitignore](.gitignore)); `ENTRA_CERT_PATH` points to it.
+
+### 3.3 Upload the certificate
+
+1. Open **Certificates & secrets → Certificates** on your app registration.
+2. Select **Upload certificate** and choose `entra-mcp-cert.cer` — upload only the public certificate, never the private key.
+3. Copy the certificate's **Thumbprint** after the upload completes — you'll need it for `.env`.
+
+### 3.4 Grant API permissions
+
+1. Open **API permissions → Add a permission → Microsoft Graph → Application permissions**.
+2. Add `Application.Read.All` and `Policy.Read.All`, then select **Add permissions**.
+3. Select **Grant admin consent for &lt;tenant&gt;** and confirm. Both permissions must show a green check under **Status** before the server can call Graph.
+
+## 4. Configure environment variables
+
+The server authenticates to Microsoft Graph via [MSAL](https://learn.microsoft.com/entra/msal/python/) certificate-based confidential client auth. Copy [.env.example](.env.example) to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Fill in the values you collected in step 3:
+
+| Variable                   | Description                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| `ENTRA_TENANT_ID`          | The **Directory (tenant) ID** from the app registration's Overview page                 |
+| `ENTRA_CLIENT_ID`          | The **Application (client) ID** from the app registration's Overview page               |
+| `ENTRA_CERT_PATH`          | Path to the PEM-encoded **private key** file (`entra-mcp-cert.key.pem`), not the `.cer` |
+| `ENTRA_CERT_THUMBPRINT`    | Thumbprint of the certificate you uploaded to the app registration                      |
+| `IMMINENT_EXPIRATION_DAYS` | Days-until-expiry threshold for the `IMMINENT_EXPIRATION` rule (default `30`)           |
+| `EXCESSIVE_LIFESPAN_DAYS`  | Max credential lifespan in days before flagging `EXCESSIVE_LIFESPAN` (default `180`)    |
+
+> ⚠️ `ENTRA_CERT_PATH` must point to the PEM **private key**, not the `.cer` file you uploaded to Entra — `auth.py` reads this file and passes its contents to MSAL as the client credential.
+
+## 5. Run the server
+
+Start the MCP server directly over stdio:
 
 ```bash
 uv run entra-posture-mcp
@@ -156,6 +233,50 @@ uv run entra-posture-mcp
 | Resource | `entra://posture/latest`             | Cached JSON from the most recent scan, queryable without re-invoking a tool                                      |
 | Prompt   | `security_triage_prompt`             | Predefined Zero-Trust triage prompt to prioritize findings and recommend fixes                                   |
 
+### Sample JSON-RPC request/response
+
+MCP clients talk to the server over stdio using [JSON-RPC 2.0](https://www.jsonrpc.org/specification) — every tool call is one request/response pair on stdin/stdout. Here's what actually crosses the wire when a client calls `revoke_or_disable_app_registration` (captured against this server):
+
+**Request** (client → server, on stdin):
+
+```jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "revoke_or_disable_app_registration",
+    "arguments": {
+      "app_id": "abc-123",
+      "action": "disable_sign_in",
+    },
+  },
+}
+```
+
+**Response** (server → client, on stdout):
+
+````jsonc
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "🔒 Dry-Run Remediation Output for App ID 'abc-123':\n\n```bash\n# PowerShell (MgGraph): Disable user sign-in\nUpdate-MgServicePrincipal -ServicePrincipalId abc-123 -AccountEnabled:$false\n```\n*(Note: Read-only mode active. Run the script manually or via CI pipeline to execute).*",
+      },
+    ],
+    "structuredContent": {
+      "result": "🔒 Dry-Run Remediation Output for App ID 'abc-123':\n\n```bash\n# PowerShell (MgGraph): Disable user sign-in\nUpdate-MgServicePrincipal -ServicePrincipalId abc-123 -AccountEnabled:$false\n```\n*(Note: Read-only mode active. Run the script manually or via CI pipeline to execute).*",
+    },
+    "isError": false,
+  },
+}
+````
+
+The MCP Inspector CLI commands in [step 6](#6-verify-the-server) print just the `result` payload — reproduce the raw envelope above by driving the server directly with the [MCP Python SDK client](https://github.com/modelcontextprotocol/python-sdk), or watch stdin/stdout while a client like Claude Desktop or VS Code Copilot Chat drives it.
+
 ### Example agent workflow
 
 ```
@@ -179,9 +300,9 @@ Agent: I found 2 CRITICAL and 3 HIGH severity issues:
        Review each command before running it — nothing has been changed in your tenant.
 ```
 
-## Manual verification
+## 6. Verify the server
 
-Before wiring the server into an LLM client, validate the JSON-RPC tool/resource/prompt schemas in isolation using the official [MCP Inspector CLI](https://github.com/modelcontextprotocol/inspector):
+Before you wire the server into an LLM client, validate the JSON-RPC tool/resource/prompt schemas in isolation using the official [MCP Inspector CLI](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
 npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/list
@@ -194,7 +315,7 @@ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
   --tool-arg app_id=abc-123 --tool-arg action=disable_sign_in
 ```
 
-Once `.env` is configured against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
+Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
 
 > 📸 _Screenshot of an MCP Inspector / Claude Desktop session to be added here after manual verification against a live tenant._
 

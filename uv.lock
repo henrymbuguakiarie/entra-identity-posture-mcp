@@ -344,6 +344,7 @@ dependencies = [
     { name = "mcp" },
     { name = "msal" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -362,6 +363,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "msal", specifier = ">=1.31.0" },
     { name = "pydantic", specifier = ">=2.10.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
 [package.metadata.requires-dev]

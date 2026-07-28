@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from entra_posture_mcp.prompts import get_security_triage_prompt
@@ -14,6 +15,8 @@ from entra_posture_mcp.tools.revoke_or_disable_app_registration import (
 from entra_posture_mcp.tools.scan_conditional_access_gaps import (
     execute_scan_conditional_access_gaps,
 )
+
+load_dotenv()
 
 mcp = FastMCP("Entra Identity Posture Guard")
 
