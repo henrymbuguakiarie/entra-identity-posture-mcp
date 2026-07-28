@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project]
+name = "entra-identity-posture-mcp"
+version = "0.1.0"
+description = "An Agentic Security and Governance MCP server built with fastMCP and Microsoft Graph API for auditing and monitoring Microsoft Entra Identity Posture, Condition Access and Zero Trust posture."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Henry Mbugua", email = "henrymbuguak@gmail.com" }
+]
+keywords = ["Microsoft Entra Identity Posture", "Condition Access", "Zero Trust", "MCP", "fastMCP", "Microsoft Graph API"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "mcp>=1.0.0",
+    "msal>=1.31.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.10.0",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+entra-posture-mcp = "entra_posture_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "respx>=0.22.0",
+    "ruff>=0.8.0",
+]
+
+# Configure hatchling to find code under src/
+[tool.hatch.build.targets.wheel]
+packages = ["src/entra_posture_mcp"]
+
+# --- Tooling Configurations ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["src"]

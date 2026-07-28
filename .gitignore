@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.venv/
+.python-version
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+
+# Environment Variables & Certificates
+*.pem
+*.pfx
+*.key
