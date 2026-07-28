@@ -14,9 +14,7 @@ async def execute_generate_remediation_plan(issues: list[dict]) -> str:
     for issue in parsed_issues:
         summary[issue.severity] += 1
 
-    template_path = (
-        Path(__file__).parent.parent / "reports" / "templates" / "security_report.md.j2"
-    )
+    template_path = Path(__file__).parent.parent / "reports" / "templates" / "security_report.md.j2"
 
     with open(template_path, encoding="utf-8") as f:
         template = Template(f.read())

@@ -1,4 +1,3 @@
-
 import pytest
 
 from entra_posture_mcp.server import mcp

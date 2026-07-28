@@ -22,8 +22,7 @@ def evaluate_conditional_access_rules(
                 severity="MEDIUM",
                 rule_id="CA_REPORT_ONLY_MODE",
                 issue=(
-                    f"Conditional Access policy '{policy.display_name}' is in "
-                    "Report-Only mode."
+                    f"Conditional Access policy '{policy.display_name}' is in Report-Only mode."
                 ),
                 recommendation=(
                     "Transition policy state from "
@@ -43,9 +42,7 @@ def evaluate_conditional_access_rules(
     excluded_roles = users_cond.get("excludeRoles", [])
 
     flagged_roles = [
-        HIGH_PRIVILEGE_ADMIN_ROLES[r]
-        for r in excluded_roles
-        if r in HIGH_PRIVILEGE_ADMIN_ROLES
+        HIGH_PRIVILEGE_ADMIN_ROLES[r] for r in excluded_roles if r in HIGH_PRIVILEGE_ADMIN_ROLES
     ]
     if flagged_roles:
         issues.append(

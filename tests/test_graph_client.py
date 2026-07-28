@@ -11,8 +11,7 @@ from entra_posture_mcp.graph_client import EntraGraphClient
 @pytest.fixture
 def mock_auth_handler():
     handler = MagicMock(spec=EntraAuthHandler)
-    handler.acquire_token.return_value = {
-        "access_token": "mock_access_token_123"}
+    handler.acquire_token.return_value = {"access_token": "mock_access_token_123"}
     return handler
 
 
@@ -22,9 +21,7 @@ async def test_get_paginated_data_single_page(mock_auth_handler):
     respx.get("https://graph.microsoft.com/v1.0/applications").mock(
         return_value=Response(
             200,
-            json={
-                "value": [{"id": "1", "displayName": "App One"}]
-            },
+            json={"value": [{"id": "1", "displayName": "App One"}]},
         )
     )
 
@@ -52,9 +49,7 @@ async def test_get_paginated_data_multiple_pages(mock_auth_handler):
             ),
             Response(
                 200,
-                json={
-                    "value": [{"id": "2", "displayName": "App Two"}]
-                },
+                json={"value": [{"id": "2", "displayName": "App Two"}]},
             ),
         ]
     )

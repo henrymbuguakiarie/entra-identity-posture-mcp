@@ -23,13 +23,15 @@ class EntraGraphClient:
         return {
             "Authorization": f"Bearer {token['access_token']}",
             "Content-Type": "application/json",
-            "ConsistencyLevel": "eventual"
+            "ConsistencyLevel": "eventual",
         }
 
     async def get_paginated_data(
-            self, endpoint: str,
-            params: dict[str, Any] | None = None,
-            max_retries: int = 3,) -> list[dict[str, Any]]:
+        self,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        max_retries: int = 3,
+    ) -> list[dict[str, Any]]:
         """Fetches paginated data from the specified Graph API endpoint."""
         headers = await self._get_headers()
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
@@ -40,7 +42,7 @@ class EntraGraphClient:
                 response = await client.get(url, headers=headers, params=params)
                 if response.status_code == 429:  # Too Many Requests
                     retries += 1
-                    await asyncio.sleep(2 ** retries)
+                    await asyncio.sleep(2**retries)
                     continue
                 response.raise_for_status()
                 data = response.json()

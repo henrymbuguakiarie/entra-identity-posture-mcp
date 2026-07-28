@@ -18,8 +18,7 @@ class EntraAuthHandler:
         self.tenant_id = tenant_id or os.getenv("ENTRA_TENANT_ID")
         self.client_id = client_id or os.getenv("ENTRA_CLIENT_ID")
         self.cert_path = cert_path or os.getenv("ENTRA_CERT_PATH")
-        self.cert_thumbprint = cert_thumbprint or os.getenv(
-            "ENTRA_CERT_THUMBPRINT")
+        self.cert_thumbprint = cert_thumbprint or os.getenv("ENTRA_CERT_THUMBPRINT")
 
         if not self.tenant_id or not self.client_id:
             raise ValueError(
@@ -56,9 +55,7 @@ class EntraAuthHandler:
         if self.app is None:
             credentials = self._get_client_credentials()
             self.app = msal.ConfidentialClientApplication(
-                client_id=self.client_id,
-                authority=self.authority,
-                client_credential=credentials
+                client_id=self.client_id, authority=self.authority, client_credential=credentials
             )
         return self.app
 
@@ -69,8 +66,7 @@ class EntraAuthHandler:
         result = app.acquire_token_for_client(scopes=self.scopes)
 
         if "access_token" not in result:
-            error_description = result.get(
-                "error_description", "Unknown error")
+            error_description = result.get("error_description", "Unknown error")
             raise RuntimeError(f"Failed to acquire token: {error_description}")
 
         return result

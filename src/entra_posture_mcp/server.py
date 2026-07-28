@@ -59,7 +59,9 @@ async def revoke_or_disable_app_registration(
     or revoke credentials.
     """
     return await execute_revoke_or_disable_app_registration(
-        app_id=app_id, action=action, key_id=key_id  # type: ignore
+        app_id=app_id,
+        action=action,
+        key_id=key_id,  # type: ignore
     )
 
 

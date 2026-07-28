@@ -55,16 +55,17 @@ def test_multi_tenant_high_risk_scope_critical():
             RequiredResourceAccess(
                 resourceAppId="00000003-0000-0000-c000-000000000000",
                 resourceAccess=[
-                    {"id": "19dbc75e-c2e2-444c-a770-ec69d8559fc7",
-                        "type": "Role"}  # Directory.ReadWrite.All
+                    {
+                        "id": "19dbc75e-c2e2-444c-a770-ec69d8559fc7",
+                        "type": "Role",
+                    }  # Directory.ReadWrite.All
                 ],
             )
         ],
     )
 
     issues = evaluate_app_registration_rules(app)
-    high_risk_issue = next(
-        i for i in issues if i.rule_id == "HIGH_RISK_PERMISSIONS")
+    high_risk_issue = next(i for i in issues if i.rule_id == "HIGH_RISK_PERMISSIONS")
 
     assert high_risk_issue.severity == "CRITICAL"
     assert "AzureADMultipleOrgs" in high_risk_issue.issue

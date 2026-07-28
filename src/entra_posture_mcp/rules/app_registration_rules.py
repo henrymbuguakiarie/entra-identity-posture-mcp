@@ -15,8 +15,7 @@ HIGH_RISK_GRAPH_PERMISSIONS = {
     "1bfefb4e-e0b5-418b-a88f-73c46d2cc8e9": "Application.ReadWrite.All",
 }
 
-MULTI_TENANT_AUDIENCES = {"AzureADMultipleOrgs",
-                          "AzureADandPersonalMicrosoftAccount"}
+MULTI_TENANT_AUDIENCES = {"AzureADMultipleOrgs", "AzureADandPersonalMicrosoftAccount"}
 
 
 def evaluate_app_registration_rules(
@@ -28,9 +27,7 @@ def evaluate_app_registration_rules(
     issues: list[SecurityIssue] = []
     now = datetime.now(UTC)
 
-    imminent_threshold = imminent_expiry_days or int(
-        os.getenv("IMMINENT_EXPIRATION_DAYS", "30")
-    )
+    imminent_threshold = imminent_expiry_days or int(os.getenv("IMMINENT_EXPIRATION_DAYS", "30"))
     excessive_threshold = excessive_lifespan_days or int(
         os.getenv("EXCESSIVE_LIFESPAN_DAYS", "180")
     )
@@ -58,8 +55,7 @@ def evaluate_app_registration_rules(
                             f"{days_until_expiry} days."
                         ),
                         recommendation=(
-                            "Rotate this credential before expiration to prevent "
-                            "pipeline failure."
+                            "Rotate this credential before expiration to prevent pipeline failure."
                         ),
                         remediation_command=(
                             "# Azure CLI: Rotate secret\n"
@@ -110,20 +106,16 @@ def evaluate_app_registration_rules(
         for access in resource.resource_access:
             res_id = access.get("id")
             if res_id in HIGH_RISK_GRAPH_PERMISSIONS:
-                found_high_risk_scopes.append(
-                    HIGH_RISK_GRAPH_PERMISSIONS[res_id])
+                found_high_risk_scopes.append(HIGH_RISK_GRAPH_PERMISSIONS[res_id])
 
     if found_high_risk_scopes:
         is_multi_tenant = app.sign_in_audience in MULTI_TENANT_AUDIENCES
         severity = "CRITICAL" if is_multi_tenant else "HIGH"
         issue_msg = (
-            "App has over-privileged Graph permissions: "
-            f"{', '.join(found_high_risk_scopes)}."
+            f"App has over-privileged Graph permissions: {', '.join(found_high_risk_scopes)}."
         )
         if is_multi_tenant:
-            issue_msg += (
-                f" Combined with multi-tenant audience '{app.sign_in_audience}'."
-            )
+            issue_msg += f" Combined with multi-tenant audience '{app.sign_in_audience}'."
 
         issues.append(
             SecurityIssue(
@@ -145,11 +137,7 @@ def evaluate_app_registration_rules(
         )
 
     # --- Rule 4: Dangerous Redirect URIs & Public Client Config ---
-    risky_uris = [
-        uri
-        for uri in app.web.redirect_uris
-        if uri.startswith("http://") or "*" in uri
-    ]
+    risky_uris = [uri for uri in app.web.redirect_uris if uri.startswith("http://") or "*" in uri]
     if risky_uris:
         issues.append(
             SecurityIssue(
@@ -158,9 +146,7 @@ def evaluate_app_registration_rules(
                 severity="HIGH",
                 rule_id="DANGEROUS_REDIRECT_URI",
                 issue=f"Insecure redirect URIs detected: {', '.join(risky_uris)}.",
-                recommendation=(
-                    "Enforce HTTPS for all redirect URIs and remove wildcards."
-                ),
+                recommendation=("Enforce HTTPS for all redirect URIs and remove wildcards."),
                 remediation_command=(
                     "# PowerShell (MgGraph): Update redirect URIs\n"
                     f"Update-MgApplication -ApplicationId {app.id} -Web "
