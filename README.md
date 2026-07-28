@@ -317,7 +317,33 @@ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
 
 Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
 
-> 📸 _Screenshot of an MCP Inspector / Claude Desktop session to be added here after manual verification against a live tenant._
+> 📸 Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant IDs redacted):
+>
+> ```console
+> $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name audit_app_registrations
+> {
+>   "content": [
+>     {
+>       "type": "text",
+>       "text": "Found 6 app registration security issues:\n\n- [HIGH] InsomniaWebApp (fd0486bd-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] web-api-4 (f7272057-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] web-app-calls-web-api-2 (5847db6c-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] identity-web-app (5cad77dc-...): Insecure redirect URIs detected: http://localhost.\n- [MEDIUM] entra-identity-posture-mcp (c712c7f1-...): Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\n- [HIGH] identity-web-app-v1 (eadcc84d-...): Insecure redirect URIs detected: http://localhost."
+>     }
+>   ],
+>   "isError": false
+> }
+>
+> $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name scan_conditional_access_gaps
+> {
+>   "content": [
+>     {
+>       "type": "text",
+>       "text": "✅ Conditional Access scan complete: All policies comply with Zero-Trust standards."
+>     }
+>   ],
+>   "isError": false
+> }
+> ```
+>
+> A GIF/screenshot of the same workflow running through Claude Desktop or VS Code Copilot Chat will replace this transcript once captured.
 
 ## Development
 
