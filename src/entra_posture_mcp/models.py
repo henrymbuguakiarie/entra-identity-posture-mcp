@@ -7,18 +7,14 @@ from pydantic import BaseModel, Field, field_validator
 class SecurityIssue(BaseModel):
     """Represents a security finding or policy violation."""
 
-    app_id: str = Field(...,
-                        description="The unique identifier of the application.")
+    app_id: str = Field(..., description="The unique identifier of the application.")
     app_name: str = Field(..., description="The name of the application.")
     severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] = Field(
         ..., description="Severity level."
     )
-    rule_id: str = Field(...,
-                         description="The unique identifier of the rule that was violated.")
-    issue: str = Field(...,
-                       description="A brief description of the security issue.")
-    recommendation: str = Field(...,
-                                description="Recommended action to remediate the issue.")
+    rule_id: str = Field(..., description="The unique identifier of the rule that was violated.")
+    issue: str = Field(..., description="A brief description of the security issue.")
+    recommendation: str = Field(..., description="Recommended action to remediate the issue.")
     remediation_command: str | None = Field(
         default=None, description="Command or steps to remediate the issue."
     )
@@ -40,10 +36,8 @@ class KeyCredential(BaseModel):
         alias="endDateTime",
         description="The end date and time of the key credential.",
     )
-    usage: str = Field(
-        default="", description="The intended usage of the key credential.")
-    type: str = Field(
-        default="", description="The type of the key credential.")
+    usage: str = Field(default="", description="The intended usage of the key credential.")
+    type: str = Field(default="", description="The type of the key credential.")
 
 
 class PasswordCredential(BaseModel):
