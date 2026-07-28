@@ -180,7 +180,7 @@ Fill in the values you collected in step 3:
 | `IMMINENT_EXPIRATION_DAYS` | Days-until-expiry threshold for the `IMMINENT_EXPIRATION` rule (default `30`)           |
 | `EXCESSIVE_LIFESPAN_DAYS`  | Max credential lifespan in days before flagging `EXCESSIVE_LIFESPAN` (default `180`)    |
 
-> ⚠️ `ENTRA_CERT_PATH` must point to the PEM **private key**, not the `.cer` file you uploaded to Entra — `auth.py` reads this file and passes its contents to MSAL as the client credential.
+> **Note:** `ENTRA_CERT_PATH` must point to the PEM **private key**, not the `.cer` file you uploaded to Entra — `auth.py` reads this file and passes its contents to MSAL as the client credential.
 
 ## 5. Run the server
 
@@ -317,7 +317,7 @@ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
 
 Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
 
-> 📸 Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant IDs redacted):
+> Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant IDs redacted):
 >
 > ```console
 > $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name audit_app_registrations
