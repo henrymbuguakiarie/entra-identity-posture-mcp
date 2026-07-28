@@ -10,7 +10,7 @@ class SecurityIssue(BaseModel):
     app_id: str = Field(...,
                         description="The unique identifier of the application.")
     app_name: str = Field(..., description="The name of the application.")
-    severity: Literal["Critical", "High", "Medium", "Low"] = Field(
+    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] = Field(
         ..., description="Severity level."
     )
     rule_id: str = Field(...,
@@ -28,7 +28,8 @@ class KeyCredential(BaseModel):
     """Represents a key credential associated with an application."""
 
     key_id: str = Field(
-        default="", description="The unique identifier of the key credential.")
+        default="", alias="keyId", description="The unique identifier of the key credential."
+    )
     start_date_time: datetime | None = Field(
         default=None,
         alias="startDateTime",
@@ -49,7 +50,9 @@ class PasswordCredential(BaseModel):
     """Represents a password credential associated with an application."""
 
     key_id: str = Field(
-        default="", description="The unique identifier of the password credential."
+        default="",
+        alias="keyId",
+        description="The unique identifier of the password credential.",
     )
     display_name: str = Field(
         default="",
@@ -83,17 +86,32 @@ class RequiredResourceAccess(BaseModel):
     )
 
 
+class WebApplication(BaseModel):
+    """Represents the web platform settings for an application registration."""
+
+    redirect_uris: list[str] = Field(
+        default_factory=list,
+        alias="redirectUris",
+        description="Redirect URIs configured for the web platform.",
+    )
+
+
 class AppRegistration(BaseModel):
     """Represents an application registration in the identity platform."""
 
-    app_id: str = Field(...,
-                        description="The unique identifier of the application.")
-    app_name: str = Field(..., description="The name of the application.")
+    id: str = Field(
+        ..., description="The unique object identifier of the application registration."
+    )
+    app_id: str = Field(
+        ..., alias="appId", description="The unique application (client) identifier."
+    )
     display_name: str = Field(
         ..., alias="displayName", description="The display name of the application."
     )
     sign_in_audience: str = Field(
-        ..., alias="signInAudience", description="The sign-in audience for the application."
+        default="AzureADMyOrg",
+        alias="signInAudience",
+        description="The sign-in audience for the application.",
     )
     key_credentials: list[KeyCredential] = Field(
         default_factory=list,
@@ -114,6 +132,11 @@ class AppRegistration(BaseModel):
         default=False,
         alias="isFallbackPublicClient",
         description="Indicates if the application is a fallback public client.",
+    )
+    web: WebApplication = Field(
+        default_factory=WebApplication,
+        alias="web",
+        description="Web platform settings, including redirect URIs.",
     )
 
 
