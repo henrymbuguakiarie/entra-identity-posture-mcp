@@ -369,7 +369,7 @@ Deliberately out of scope for v1:
 - **Terraform file generation** (e.g. `azuread_application_password`, `azuread_application_pre_authorized`) for remediation — v1 only emits dry-run Azure CLI / PowerShell snippets.
 - **Automated GitHub PR creation** for remediation changes — v1 leaves execution and change management entirely to the human/CI pipeline.
 
-Both are fast-follow candidates once v1 has been validated against a live tenant.
+Both are fast-follow candidates now that v1 has been validated against a live tenant.
 
 ## License
 
