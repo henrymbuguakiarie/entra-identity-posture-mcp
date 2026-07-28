@@ -1,0 +1,35 @@
+# 🛡️ Entra ID Identity Posture & Zero-Trust Report
+
+**Generated at:** {{ generated_at }}  
+**Total Issues Found:** {{ issues | length }}
+
+---
+
+## Summary by Severity
+- **CRITICAL:** {{ summary.CRITICAL }}
+- **HIGH:** {{ summary.HIGH }}
+- **MEDIUM:** {{ summary.MEDIUM }}
+- **LOW:** {{ summary.LOW }}
+
+---
+
+## Detailed Findings & Dry-Run Remediation
+
+{% for issue in issues %}
+### [{{ issue.severity }}] {{ issue.rule_id }}: {{ issue.app_name }}
+- **App / Policy ID:** `{{ issue.app_id }}`
+- **Issue:** {{ issue.issue }}
+- **Recommendation:** {{ issue.recommendation }}
+
+{% if issue.remediation_command %}
+```powershell
+{{ issue.remediation_command }}
+```
+{% endif %}
+
+{% else %}
+No posture violations found. Your Microsoft Entra ID environment is aligned with Zero Trust principles.
+{% endfor %}
+
+---
+
