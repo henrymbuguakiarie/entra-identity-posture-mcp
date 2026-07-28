@@ -31,8 +31,7 @@ async def execute_audit_app_registrations(
     if not all_issues:
         return "Audit complete: No app registration security issues detected."
 
-    summary_lines = [
-        f"Found {len(all_issues)} app registration security issues:\n"]
+    summary_lines = [f"Found {len(all_issues)} app registration security issues:\n"]
     for issue in all_issues:
         summary_lines.append(
             f"- [{issue.severity}] {issue.app_name} ({issue.app_id}): {issue.issue}"

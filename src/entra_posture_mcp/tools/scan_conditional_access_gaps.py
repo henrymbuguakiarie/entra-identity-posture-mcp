@@ -21,10 +21,8 @@ async def execute_scan_conditional_access_gaps(
     if not all_issues:
         return "✅ Conditional Access scan complete: All policies comply with Zero-Trust standards."
 
-    summary_lines = [
-        f"Found {len(all_issues)} Conditional Access policy gaps:\n"]
+    summary_lines = [f"Found {len(all_issues)} Conditional Access policy gaps:\n"]
     for issue in all_issues:
-        summary_lines.append(
-            f"- [{issue.severity}] Policy '{issue.app_name}': {issue.issue}")
+        summary_lines.append(f"- [{issue.severity}] Policy '{issue.app_name}': {issue.issue}")
 
     return "\n".join(summary_lines)

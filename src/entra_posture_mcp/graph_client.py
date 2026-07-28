@@ -138,6 +138,5 @@ def get_shared_graph_client() -> EntraGraphClient:
     """
     global _shared_graph_client
     if _shared_graph_client is None:
-        _shared_graph_client = EntraGraphClient(
-            auth_handler=EntraAuthHandler())
+        _shared_graph_client = EntraGraphClient(auth_handler=EntraAuthHandler())
     return _shared_graph_client
