@@ -1,5 +1,4 @@
-from entra_posture_mcp.auth import EntraAuthHandler
-from entra_posture_mcp.graph_client import EntraGraphClient
+from entra_posture_mcp.graph_client import EntraGraphClient, get_shared_graph_client
 from entra_posture_mcp.models import AppRegistration, SecurityIssue
 from entra_posture_mcp.resources import update_latest_scan_cache
 from entra_posture_mcp.rules.app_registration_rules import evaluate_app_registration_rules
@@ -12,8 +11,7 @@ async def execute_audit_app_registrations(
 ) -> str:
     """Scans Entra ID app registrations for expiring secrets, risky scopes, and redirect URIs."""
     if graph_client is None:
-        auth = EntraAuthHandler()
-        graph_client = EntraGraphClient(auth_handler=auth)
+        graph_client = get_shared_graph_client()
 
     raw_apps = await graph_client.get_app_registrations()
     all_issues: list[SecurityIssue] = []
@@ -33,7 +31,8 @@ async def execute_audit_app_registrations(
     if not all_issues:
         return "Audit complete: No app registration security issues detected."
 
-    summary_lines = [f"Found {len(all_issues)} app registration security issues:\n"]
+    summary_lines = [
+        f"Found {len(all_issues)} app registration security issues:\n"]
     for issue in all_issues:
         summary_lines.append(
             f"- [{issue.severity}] {issue.app_name} ({issue.app_id}): {issue.issue}"

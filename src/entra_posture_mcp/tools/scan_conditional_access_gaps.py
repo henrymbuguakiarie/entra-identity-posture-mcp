@@ -1,5 +1,4 @@
-from entra_posture_mcp.auth import EntraAuthHandler
-from entra_posture_mcp.graph_client import EntraGraphClient
+from entra_posture_mcp.graph_client import EntraGraphClient, get_shared_graph_client
 from entra_posture_mcp.models import ConditionalAccessPolicy, SecurityIssue
 from entra_posture_mcp.rules.conditional_access_rules import evaluate_conditional_access_rules
 
@@ -9,8 +8,7 @@ async def execute_scan_conditional_access_gaps(
 ) -> str:
     """Scans Conditional Access policies for MFA admin exclusions and report-only status."""
     if graph_client is None:
-        auth = EntraAuthHandler()
-        graph_client = EntraGraphClient(auth_handler=auth)
+        graph_client = get_shared_graph_client()
 
     raw_policies = await graph_client.get_conditional_access_policies()
     all_issues: list[SecurityIssue] = []
@@ -23,8 +21,10 @@ async def execute_scan_conditional_access_gaps(
     if not all_issues:
         return "✅ Conditional Access scan complete: All policies comply with Zero-Trust standards."
 
-    summary_lines = [f"Found {len(all_issues)} Conditional Access policy gaps:\n"]
+    summary_lines = [
+        f"Found {len(all_issues)} Conditional Access policy gaps:\n"]
     for issue in all_issues:
-        summary_lines.append(f"- [{issue.severity}] Policy '{issue.app_name}': {issue.issue}")
+        summary_lines.append(
+            f"- [{issue.severity}] Policy '{issue.app_name}': {issue.issue}")
 
     return "\n".join(summary_lines)
