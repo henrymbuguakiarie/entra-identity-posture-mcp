@@ -35,8 +35,15 @@ def evaluate_app_registration_rules(
     )
 
     # --- Rule 1 & 2: Credential Expiration & Excessive Lifespan ---
-    all_creds = app.key_credentials + app.password_credentials
-    for cred in all_creds:
+    tagged_creds = [("certificate", cred) for cred in app.key_credentials] + [
+        ("password", cred) for cred in app.password_credentials
+    ]
+    for credential_type, cred in tagged_creds:
+        rotate_action = (
+            "rotate_certificate_credential"
+            if credential_type == "certificate"
+            else "rotate_password_credential"
+        )
         if cred.end_date_time:
             end_dt = (
                 cred.end_date_time
@@ -46,6 +53,19 @@ def evaluate_app_registration_rules(
             days_until_expiry = (end_dt - now).days
 
             if 0 <= days_until_expiry <= imminent_threshold:
+                if credential_type == "certificate":
+                    rotate_command = (
+                        "# Azure CLI: Rotate certificate (--append keeps other credentials "
+                        "active;\n# --create-cert auto-generates a new self-signed cert - use "
+                        "--cert @/path/to/cert.pem instead\n# to append your own PKI-issued "
+                        "certificate)\n"
+                        f"az ad app credential reset --id {app.app_id} --append --create-cert"
+                    )
+                else:
+                    rotate_command = (
+                        "# Azure CLI: Rotate secret (--append keeps other credentials active)\n"
+                        f"az ad app credential reset --id {app.app_id} --append"
+                    )
                 issues.append(
                     SecurityIssue(
                         app_id=app.app_id,
@@ -60,16 +80,14 @@ def evaluate_app_registration_rules(
                         recommendation=(
                             "Rotate this credential before expiration to prevent pipeline failure."
                         ),
-                        remediation_command=(
-                            "# Azure CLI: Rotate secret (--append keeps other credentials active)\n"
-                            f"az ad app credential reset --id {app.app_id} --append"
-                        ),
+                        remediation_command=rotate_command,
                         evidence={
                             "key_id": cred.key_id,
+                            "credential_type": credential_type,
                             "days_until_expiry": days_until_expiry,
                             "end_date_time": end_dt.isoformat(),
                         },
-                        remediation_action="rotate_credential",
+                        remediation_action=rotate_action,
                         remediation_params={"app_id": app.app_id},
                     )
                 )
@@ -110,6 +128,7 @@ def evaluate_app_registration_rules(
                         ),
                         evidence={
                             "key_id": cred.key_id,
+                            "credential_type": credential_type,
                             "lifespan_days": total_lifespan_days,
                             "start_date_time": start_dt.isoformat(),
                             "end_date_time": end_dt.isoformat(),

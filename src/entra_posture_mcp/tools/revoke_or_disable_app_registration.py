@@ -4,7 +4,11 @@ from typing import Literal
 async def execute_revoke_or_disable_app_registration(
     app_id: str,
     action: Literal[
-        "disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"
+        "disable_sign_in",
+        "remove_credential",
+        "remove_permission",
+        "rotate_password_credential",
+        "rotate_certificate_credential",
     ],
     key_id: str | None = None,
 ) -> str:
@@ -18,14 +22,20 @@ async def execute_revoke_or_disable_app_registration(
             f"# (Get-MgServicePrincipal -Filter \"appId eq '{app_id}'\").Id\n"
             f"Update-MgServicePrincipal -ServicePrincipalId {app_id} -AccountEnabled:$false"
         )
-    elif action == "rotate_credential":
+    elif action == "rotate_password_credential":
         cmd = (
-            "# Azure CLI: Rotate secret\n"
-            "# NOTE: By default this command clears ALL existing password/certificate\n"
-            "# credentials on the app and creates one new one. Add --append to add a\n"
-            "# new credential without removing existing ones (recommended for zero-\n"
-            "# downtime rotation of a single expiring credential).\n"
+            "# Azure CLI: Rotate password credential (client secret)\n"
+            "# NOTE: --append adds a new secret without removing existing credentials\n"
+            "# (recommended for zero-downtime rotation of a single expiring secret).\n"
             f"az ad app credential reset --id {app_id} --append"
+        )
+    elif action == "rotate_certificate_credential":
+        cmd = (
+            "# Azure CLI: Rotate certificate credential\n"
+            "# NOTE: --append adds a new certificate without removing existing credentials.\n"
+            "# --create-cert auto-generates a new self-signed certificate; to append your\n"
+            "# own PKI-issued certificate instead, use --cert @/path/to/cert.pem.\n"
+            f"az ad app credential reset --id {app_id} --append --create-cert"
         )
     elif action == "remove_credential":
         if not key_id:

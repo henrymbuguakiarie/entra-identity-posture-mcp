@@ -1,7 +1,7 @@
 import asyncio
 
 from entra_posture_mcp.graph_client import EntraGraphClient, get_shared_graph_client
-from entra_posture_mcp.models import PostureScanResult, ScanMetadata, SecurityIssue
+from entra_posture_mcp.models import PostureScanResult, ScanMetadata, SecurityIssue, Severity
 from entra_posture_mcp.resources import update_latest_scan_cache
 from entra_posture_mcp.rules.app_registration_rules import RULE_VERSION as APP_RULE_VERSION
 from entra_posture_mcp.rules.conditional_access_rules import RULE_VERSION as CA_RULE_VERSION
@@ -17,14 +17,14 @@ from entra_posture_mcp.tools.scan_conditional_access_gaps import (
 
 def _filter_issues(
     issues: list[SecurityIssue],
-    severity: str | None,
+    severity: Severity | None,
     rule_id: str | None,
     app_id: str | None,
 ) -> list[SecurityIssue]:
     """Applies optional severity/rule_id/app_id filters to a combined issue list."""
     filtered = issues
     if severity:
-        filtered = [i for i in filtered if i.severity == severity.upper()]
+        filtered = [i for i in filtered if i.severity == severity]
     if rule_id:
         filtered = [i for i in filtered if i.rule_id == rule_id]
     if app_id:
@@ -54,7 +54,7 @@ def _format_combined_summary(filtered: list[SecurityIssue], total: int, has_filt
 async def execute_run_posture_scan(
     imminent_expiry_days: int = 30,
     excessive_lifespan_days: int = 180,
-    severity: str | None = None,
+    severity: Severity | None = None,
     rule_id: str | None = None,
     app_id: str | None = None,
     graph_client: EntraGraphClient | None = None,

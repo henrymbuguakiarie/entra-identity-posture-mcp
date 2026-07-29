@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from entra_posture_mcp.models import (
     AppRegistration,
     ConditionalAccessPolicy,
+    KeyCredential,
     PasswordCredential,
     RequiredResourceAccess,
 )
@@ -45,14 +46,41 @@ def test_imminent_expiration_and_excessive_lifespan():
     assert "EXCESSIVE_LIFESPAN" in rule_ids
 
     imminent = next(i for i in issues if i.rule_id == "IMMINENT_EXPIRATION")
-    assert imminent.remediation_action == "rotate_credential"
+    assert imminent.remediation_action == "rotate_password_credential"
     assert imminent.remediation_params == {"app_id": "client-1"}
     assert imminent.evidence["key_id"] == "k1"
+    assert imminent.evidence["credential_type"] == "password"
 
     excessive = next(i for i in issues if i.rule_id == "EXCESSIVE_LIFESPAN")
     assert excessive.remediation_action == "remove_credential"
     assert excessive.remediation_params == {"app_id": "client-1", "key_id": "k2"}
     assert excessive.evidence["key_id"] == "k2"
+    assert excessive.evidence["credential_type"] == "password"
+
+
+def test_imminent_expiration_certificate_credential_uses_certificate_action():
+    now = datetime.now(UTC)
+    app = AppRegistration(
+        id="obj-1b",
+        appId="client-1b",
+        displayName="Cert App",
+        keyCredentials=[
+            KeyCredential(
+                keyId="cert-1",
+                startDateTime=now - timedelta(days=30),
+                endDateTime=now + timedelta(days=10),
+                usage="Verify",
+                type="AsymmetricX509Cert",
+            ),
+        ],
+    )
+
+    issues = evaluate_app_registration_rules(app)
+    imminent = next(i for i in issues if i.rule_id == "IMMINENT_EXPIRATION")
+
+    assert imminent.remediation_action == "rotate_certificate_credential"
+    assert imminent.evidence["credential_type"] == "certificate"
+    assert "--create-cert" in imminent.remediation_command
 
 
 def test_multi_tenant_high_risk_scope_critical():

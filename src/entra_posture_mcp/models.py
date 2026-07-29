@@ -3,15 +3,23 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+Severity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+
+RemediationAction = Literal[
+    "disable_sign_in",
+    "remove_credential",
+    "remove_permission",
+    "rotate_password_credential",
+    "rotate_certificate_credential",
+]
+
 
 class SecurityIssue(BaseModel):
     """Represents a security finding or policy violation."""
 
     app_id: str = Field(..., description="The unique identifier of the application.")
     app_name: str = Field(..., description="The name of the application.")
-    severity: Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"] = Field(
-        ..., description="Severity level."
-    )
+    severity: Severity = Field(..., description="Severity level.")
     rule_id: str = Field(..., description="The unique identifier of the rule that was violated.")
     rule_version: str = Field(
         default="1.0", description="Version of the rule definition that produced this finding."
@@ -25,10 +33,7 @@ class SecurityIssue(BaseModel):
         default_factory=dict,
         description="Structured evidence backing the finding (e.g. key_id, policy id, scopes).",
     )
-    remediation_action: (
-        Literal["disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"]
-        | None
-    ) = Field(
+    remediation_action: RemediationAction | None = Field(
         default=None,
         description="The action to pass to revoke_or_disable_app_registration, if applicable.",
     )

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from entra_posture_mcp.graph_client import aclose_shared_graph_client
-from entra_posture_mcp.models import PostureScanResult
+from entra_posture_mcp.models import PostureScanResult, Severity
 from entra_posture_mcp.prompts import get_security_triage_prompt
 from entra_posture_mcp.resources import get_latest_scan_json
 from entra_posture_mcp.tools.audit_app_registrations import (
@@ -71,7 +71,7 @@ async def scan_conditional_access_gaps() -> PostureScanResult:
 async def run_posture_scan(
     imminent_expiry_days: int = 30,
     excessive_lifespan_days: int = 180,
-    severity: str | None = None,
+    severity: Severity | None = None,
     rule_id: str | None = None,
     app_id: str | None = None,
 ) -> PostureScanResult:
@@ -100,7 +100,11 @@ async def generate_remediation_plan(issues: list[dict]) -> str:
 async def revoke_or_disable_app_registration(
     app_id: str,
     action: Literal[
-        "disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"
+        "disable_sign_in",
+        "remove_credential",
+        "remove_permission",
+        "rotate_password_credential",
+        "rotate_certificate_credential",
     ],
     key_id: str | None = None,
 ) -> str:
