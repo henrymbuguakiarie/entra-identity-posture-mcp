@@ -61,16 +61,16 @@ def evaluate_app_registration_rules(
                             "Rotate this credential before expiration to prevent pipeline failure."
                         ),
                         remediation_command=(
-                            "# Azure CLI: Rotate secret\n"
-                            f"az ad app credential reset --id {app.app_id}"
+                            "# Azure CLI: Rotate secret (--append keeps other credentials active)\n"
+                            f"az ad app credential reset --id {app.app_id} --append"
                         ),
                         evidence={
                             "key_id": cred.key_id,
                             "days_until_expiry": days_until_expiry,
                             "end_date_time": end_dt.isoformat(),
                         },
-                        remediation_action="remove_credential",
-                        remediation_params={"app_id": app.app_id, "key_id": cred.key_id},
+                        remediation_action="rotate_credential",
+                        remediation_params={"app_id": app.app_id},
                     )
                 )
 

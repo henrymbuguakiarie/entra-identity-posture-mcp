@@ -44,6 +44,16 @@ def test_imminent_expiration_and_excessive_lifespan():
     assert "IMMINENT_EXPIRATION" in rule_ids
     assert "EXCESSIVE_LIFESPAN" in rule_ids
 
+    imminent = next(i for i in issues if i.rule_id == "IMMINENT_EXPIRATION")
+    assert imminent.remediation_action == "rotate_credential"
+    assert imminent.remediation_params == {"app_id": "client-1"}
+    assert imminent.evidence["key_id"] == "k1"
+
+    excessive = next(i for i in issues if i.rule_id == "EXCESSIVE_LIFESPAN")
+    assert excessive.remediation_action == "remove_credential"
+    assert excessive.remediation_params == {"app_id": "client-1", "key_id": "k2"}
+    assert excessive.evidence["key_id"] == "k2"
+
 
 def test_multi_tenant_high_risk_scope_critical():
     app = AppRegistration(
@@ -89,3 +99,7 @@ def test_conditional_access_report_only_and_admin_exclusion():
 
     assert "CA_REPORT_ONLY_MODE" in rule_ids
     assert "CA_ADMIN_MFA_EXCLUSION" in rule_ids
+
+    admin_exclusion = next(i for i in issues if i.rule_id == "CA_ADMIN_MFA_EXCLUSION")
+    assert admin_exclusion.evidence["policy_id"] == "ca-1"
+    assert "Global Administrator" in admin_exclusion.evidence["excluded_roles"]

@@ -12,6 +12,7 @@ This server exposes Microsoft Entra ID (Azure AD) security posture data as a ful
 
 - Audit app registrations for expiring/long-lived credentials, over-privileged Graph permissions, insecure redirect URIs, and risky multi-tenant configurations
 - Scan Conditional Access policies for admin MFA exclusions and policies stuck in report-only mode
+- Run both scans concurrently with a single `run_posture_scan` call, with optional severity/rule/app filtering, when an agent wants one combined pass instead of two separate tool calls
 - Generate a Markdown Zero-Trust security report plus ready-to-run (dry-run only) Azure CLI / Microsoft Graph PowerShell remediation commands
 - Query the most recent scan results directly as an MCP Resource, without re-invoking a tool
 - Kick off a guided triage workflow via a predefined MCP Prompt
@@ -29,12 +30,13 @@ flowchart LR
     subgraph Server["entra-identity-posture-mcp (FastMCP, stdio)"]
         T1[Tool: audit_app_registrations]
         T2[Tool: scan_conditional_access_gaps]
+        T5[Tool: run_posture_scan]
         T3[Tool: generate_remediation_plan]
         T4[Tool: revoke_or_disable_app_registration]
         R1[Resource: entra://posture/latest]
         P1[Prompt: security_triage_prompt]
         Rules[Rules Engine\napp_registration_rules.py\nconditional_access_rules.py]
-        Cache[(In-memory\nscan cache)]
+        Cache[(In-memory\nposture cache\nper category)]
     end
 
     subgraph Graph["Microsoft Graph API"]
@@ -45,14 +47,16 @@ flowchart LR
 
     Auth[auth.py\nMSAL cert-based\nConfidentialClientApplication]
 
-    A -->|JSON-RPC over stdio| T1 & T2 & T3 & T4 & R1 & P1
+    A -->|JSON-RPC over stdio| T1 & T2 & T5 & T3 & T4 & R1 & P1
     T1 --> Rules
     T2 --> Rules
+    T5 --> Rules
     T1 -->|GET| G1 & G2
     T2 -->|GET| G3
-    T1 & T2 -.->|auth token| Auth
+    T5 -->|GET| G1 & G2 & G3
+    T1 & T2 & T5 -.->|auth token| Auth
     Auth -->|client cert| G1
-    T1 & T2 --> Cache
+    T1 & T2 & T5 --> Cache
     R1 --> Cache
     T3 -->|renders| Report[[security_report.md.j2]]
 ```
@@ -224,14 +228,15 @@ uv run entra-posture-mcp
 
 ### MCP surface reference
 
-| Kind     | Name                                 | Description                                                                                                      |
-| -------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Tool     | `audit_app_registrations`            | Scans app registrations for expiring/long-lived secrets, risky permissions, and insecure redirect URIs           |
-| Tool     | `scan_conditional_access_gaps`       | Scans Conditional Access policies for admin MFA exclusions and report-only status                                |
-| Tool     | `generate_remediation_plan`          | Renders a Markdown Zero-Trust report + dry-run CLI/PowerShell snippets from findings                             |
-| Tool     | `revoke_or_disable_app_registration` | Generates a dry-run Azure CLI/PowerShell command to disable sign-in, remove a credential, or remove a permission |
-| Resource | `entra://posture/latest`             | Cached JSON from the most recent scan, queryable without re-invoking a tool                                      |
-| Prompt   | `security_triage_prompt`             | Predefined Zero-Trust triage prompt to prioritize findings and recommend fixes                                   |
+| Kind     | Name                                 | Description                                                                                                                                                                       |
+| -------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tool     | `audit_app_registrations`            | Scans app registrations for expiring/long-lived secrets, risky permissions, and insecure redirect URIs. Returns structured findings (`metadata` + `issues`) plus a text `summary` |
+| Tool     | `scan_conditional_access_gaps`       | Scans Conditional Access policies for admin MFA exclusions and report-only status. Returns structured findings plus a text `summary`                                              |
+| Tool     | `run_posture_scan`                   | Runs both scans above concurrently and returns one merged, optionally severity/rule/app-filtered result. Updates both cache categories                                            |
+| Tool     | `generate_remediation_plan`          | Renders a Markdown Zero-Trust report + dry-run CLI/PowerShell snippets from findings                                                                                              |
+| Tool     | `revoke_or_disable_app_registration` | Generates a dry-run Azure CLI/PowerShell command to disable sign-in, rotate or remove a credential, or remove a permission                                                        |
+| Resource | `entra://posture/latest`             | Cached JSON from the most recent scan of each category (app registrations, Conditional Access), queryable without re-invoking a tool                                              |
+| Prompt   | `security_triage_prompt`             | Predefined Zero-Trust triage prompt to prioritize findings and recommend fixes                                                                                                    |
 
 ### Sample JSON-RPC request/response
 
@@ -282,8 +287,7 @@ The MCP Inspector CLI commands in [step 6](#6-verify-the-server) print just the 
 ```
 User: Run a Zero-Trust audit on my Entra tenant and tell me what to fix first.
 
-Agent: [calls audit_app_registrations]
-       [calls scan_conditional_access_gaps]
+Agent: [calls run_posture_scan]
        [calls generate_remediation_plan with the combined findings]
 
 Agent: I found 2 CRITICAL and 3 HIGH severity issues:
@@ -315,9 +319,9 @@ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
   --tool-arg app_id=abc-123 --tool-arg action=disable_sign_in
 ```
 
-Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
+Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` / `run_posture_scan` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
 
-> Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant IDs redacted):
+> Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant/app IDs redacted). Scan tools return structured `metadata` + `issues` alongside a `summary` text field — shown below trimmed to the first finding and the summary for brevity:
 >
 > ```console
 > $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name audit_app_registrations
@@ -325,7 +329,7 @@ Once you configure `.env` against a real test tenant, run the stdio entrypoint a
 >   "content": [
 >     {
 >       "type": "text",
->       "text": "Found 6 app registration security issues:\n\n- [HIGH] InsomniaWebApp (fd0486bd-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] web-api-4 (f7272057-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] web-app-calls-web-api-2 (5847db6c-...): Insecure redirect URIs detected: http://localhost.\n- [HIGH] identity-web-app (5cad77dc-...): Insecure redirect URIs detected: http://localhost.\n- [MEDIUM] entra-identity-posture-mcp (c712c7f1-...): Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\n- [HIGH] identity-web-app-v1 (eadcc84d-...): Insecure redirect URIs detected: http://localhost."
+>       "text": "{\n  \"metadata\": {\n    \"tenant_id\": \"248c1b45-...\",\n    \"scanned_at\": \"2026-07-29T09:10:26.662088Z\",\n    \"rule_version\": \"1.1\"\n  },\n  \"issues\": [\n    {\n      \"app_id\": \"fd0486bd-...\",\n      \"app_name\": \"InsomniaWebApp\",\n      \"severity\": \"HIGH\",\n      \"rule_id\": \"DANGEROUS_REDIRECT_URI\",\n      \"issue\": \"Insecure redirect URIs detected: http://localhost.\",\n      \"evidence\": {\"redirect_uris\": [\"http://localhost\"]},\n      \"remediation_action\": null,\n      ... 5 more issues ...\n    }\n  ],\n  \"summary\": \"Found 6 app registration security issues:\\n\\n- [HIGH] InsomniaWebApp (fd0486bd-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] web-api-4 (f7272057-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] web-app-calls-web-api-2 (5847db6c-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] identity-web-app (5cad77dc-...): Insecure redirect URIs detected: http://localhost.\\n- [MEDIUM] entra-identity-posture-mcp (c712c7f1-...): Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\\n- [HIGH] identity-web-app-v1 (eadcc84d-...): Insecure redirect URIs detected: http://localhost.\"\n}"
 >     }
 >   ],
 >   "isError": false
@@ -336,7 +340,7 @@ Once you configure `.env` against a real test tenant, run the stdio entrypoint a
 >   "content": [
 >     {
 >       "type": "text",
->       "text": "✅ Conditional Access scan complete: All policies comply with Zero-Trust standards."
+>       "text": "{\n  \"metadata\": {\n    \"tenant_id\": \"248c1b45-...\",\n    \"scanned_at\": \"2026-07-29T09:11:33.227421Z\",\n    \"rule_version\": \"1.1\"\n  },\n  \"issues\": [],\n  \"summary\": \"✅ Conditional Access scan complete: All policies comply with Zero-Trust standards.\"\n}"
 >     }
 >   ],
 >   "isError": false

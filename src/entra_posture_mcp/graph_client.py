@@ -1,5 +1,7 @@
 import asyncio
+import email.utils
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -10,6 +12,31 @@ logger = logging.getLogger(__name__)
 
 # Transient status codes worth retrying with backoff: rate limiting and server errors.
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+# Explicit request timeout: 10s to establish a connection, 30s total per request,
+# so a slow/unresponsive Graph endpoint can't hang a tool call indefinitely.
+_DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    """Parses a Retry-After header (either delay-seconds or an HTTP-date) into seconds.
+
+    Returns None if the header is absent or cannot be parsed, so callers can fall
+    back to exponential backoff.
+    """
+    if not value:
+        return None
+    if value.isdigit():
+        return float(value)
+    try:
+        parsed = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed is None:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return max((parsed - datetime.now(UTC)).total_seconds(), 0.0)
 
 
 class EntraGraphClient:
@@ -25,7 +52,7 @@ class EntraGraphClient:
         opening a new connection pool for every call.
         """
         if self._client is None:
-            self._client = httpx.AsyncClient()
+            self._client = httpx.AsyncClient(timeout=_DEFAULT_TIMEOUT)
         return self._client
 
     async def aclose(self) -> None:
@@ -84,14 +111,18 @@ class EntraGraphClient:
                     retries += 1
                     if retries > max_retries:
                         response.raise_for_status()
+                    wait_seconds = _parse_retry_after(response.headers.get("Retry-After"))
+                    if wait_seconds is None:
+                        wait_seconds = 2**retries
                     logger.warning(
-                        "Retryable status %d calling %s (attempt %d/%d)",
+                        "Retryable status %d calling %s (attempt %d/%d), waiting %.1fs",
                         response.status_code,
                         url,
                         retries,
                         max_retries,
+                        wait_seconds,
                     )
-                    await asyncio.sleep(2**retries)
+                    await asyncio.sleep(wait_seconds)
                     continue
 
                 response.raise_for_status()

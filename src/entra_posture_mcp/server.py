@@ -1,8 +1,11 @@
+from contextlib import asynccontextmanager
 from typing import Literal
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from entra_posture_mcp.graph_client import get_shared_graph_client
+from entra_posture_mcp.models import PostureScanResult
 from entra_posture_mcp.prompts import get_security_triage_prompt
 from entra_posture_mcp.resources import get_latest_scan_json
 from entra_posture_mcp.tools.audit_app_registrations import (
@@ -21,7 +24,17 @@ from entra_posture_mcp.tools.scan_conditional_access_gaps import (
 
 load_dotenv()
 
-mcp = FastMCP("Entra Identity Posture Guard")
+
+@asynccontextmanager
+async def lifespan(_server: FastMCP):
+    """Closes the shared Graph HTTP client's connection pool on server shutdown."""
+    try:
+        yield
+    finally:
+        await get_shared_graph_client().aclose()
+
+
+mcp = FastMCP("Entra Identity Posture Guard", lifespan=lifespan)
 
 
 # --- Register MCP Tools ---
@@ -29,9 +42,10 @@ mcp = FastMCP("Entra Identity Posture Guard")
 async def audit_app_registrations(
     imminent_expiry_days: int = 30,
     excessive_lifespan_days: int = 180,
-) -> str:
+) -> PostureScanResult:
     """Scans Entra ID app registrations for expiring secrets, excessive lifespans,
-    risky permissions, and insecure redirect URIs.
+    risky permissions, and insecure redirect URIs. Returns structured findings
+    (metadata + issues) alongside a human-readable summary.
     """
     return await execute_audit_app_registrations(
         imminent_expiry_days=imminent_expiry_days,
@@ -40,9 +54,10 @@ async def audit_app_registrations(
 
 
 @mcp.tool()
-async def scan_conditional_access_gaps() -> str:
+async def scan_conditional_access_gaps() -> PostureScanResult:
     """Scans Entra Conditional Access policies for admin MFA exclusions and
-    policies stuck in report-only mode.
+    policies stuck in report-only mode. Returns structured findings alongside
+    a human-readable summary.
     """
     return await execute_scan_conditional_access_gaps()
 
@@ -54,9 +69,9 @@ async def run_posture_scan(
     severity: str | None = None,
     rule_id: str | None = None,
     app_id: str | None = None,
-) -> str:
+) -> PostureScanResult:
     """Runs the app registration and Conditional Access scans concurrently and
-    returns one combined, optionally filtered posture summary. Updates the
+    returns one combined, optionally filtered PostureScanResult. Updates the
     shared entra://posture/latest resource cache with both scan categories.
     """
     return await execute_run_posture_scan(
@@ -79,7 +94,9 @@ async def generate_remediation_plan(issues: list[dict]) -> str:
 @mcp.tool()
 async def revoke_or_disable_app_registration(
     app_id: str,
-    action: Literal["disable_sign_in", "remove_credential", "remove_permission"],
+    action: Literal[
+        "disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"
+    ],
     key_id: str | None = None,
 ) -> str:
     """Generates dry-run Azure CLI or PowerShell commands to disable sign-in

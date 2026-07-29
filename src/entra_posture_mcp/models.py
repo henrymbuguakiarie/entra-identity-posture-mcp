@@ -26,7 +26,8 @@ class SecurityIssue(BaseModel):
         description="Structured evidence backing the finding (e.g. key_id, policy id, scopes).",
     )
     remediation_action: (
-        Literal["disable_sign_in", "remove_credential", "remove_permission"] | None
+        Literal["disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"]
+        | None
     ) = Field(
         default=None,
         description="The action to pass to revoke_or_disable_app_registration, if applicable.",
@@ -50,6 +51,24 @@ class ScanMetadata(BaseModel):
     rule_version: str = Field(
         default="1.0", description="Version of the rule set used to generate findings."
     )
+
+
+class PostureScanResult(BaseModel):
+    """Structured result returned by scan tools.
+
+    Carries the same findings as the `entra://posture/latest` resource cache
+    (`metadata` + `issues`) directly in the tool call result, so an agent can
+    act on structured data without a separate resource read, while `summary`
+    keeps a short human-readable recap for display.
+    """
+
+    metadata: ScanMetadata = Field(
+        ..., description="Scan-level context: tenant, timestamp, rule version."
+    )
+    issues: list[SecurityIssue] = Field(
+        default_factory=list, description="Structured findings produced by the scan."
+    )
+    summary: str = Field(..., description="Human-readable recap of the findings.")
 
 
 class KeyCredential(BaseModel):

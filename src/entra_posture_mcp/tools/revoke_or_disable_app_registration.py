@@ -3,7 +3,9 @@ from typing import Literal
 
 async def execute_revoke_or_disable_app_registration(
     app_id: str,
-    action: Literal["disable_sign_in", "remove_credential", "remove_permission"],
+    action: Literal[
+        "disable_sign_in", "remove_credential", "remove_permission", "rotate_credential"
+    ],
     key_id: str | None = None,
 ) -> str:
     """Generates dry-run Azure CLI / PowerShell command to remediate an app registration issue."""
@@ -15,6 +17,15 @@ async def execute_revoke_or_disable_app_registration(
             "# resolve it first, e.g.:\n"
             f"# (Get-MgServicePrincipal -Filter \"appId eq '{app_id}'\").Id\n"
             f"Update-MgServicePrincipal -ServicePrincipalId {app_id} -AccountEnabled:$false"
+        )
+    elif action == "rotate_credential":
+        cmd = (
+            "# Azure CLI: Rotate secret\n"
+            "# NOTE: By default this command clears ALL existing password/certificate\n"
+            "# credentials on the app and creates one new one. Add --append to add a\n"
+            "# new credential without removing existing ones (recommended for zero-\n"
+            "# downtime rotation of a single expiring credential).\n"
+            f"az ad app credential reset --id {app_id} --append"
         )
     elif action == "remove_credential":
         if not key_id:
