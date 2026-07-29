@@ -4,15 +4,16 @@ from entra_posture_mcp.resources import update_latest_scan_cache
 from entra_posture_mcp.rules.app_registration_rules import evaluate_app_registration_rules
 
 
-async def execute_audit_app_registrations(
-    imminent_expiry_days: int = 30,
-    excessive_lifespan_days: int = 180,
-    graph_client: EntraGraphClient | None = None,
-) -> str:
-    """Scans Entra ID app registrations for expiring secrets, risky scopes, and redirect URIs."""
-    if graph_client is None:
-        graph_client = get_shared_graph_client()
+async def fetch_app_registration_issues(
+    imminent_expiry_days: int,
+    excessive_lifespan_days: int,
+    graph_client: EntraGraphClient,
+) -> list[SecurityIssue]:
+    """Fetches app registrations from Graph and evaluates them against the rule set.
 
+    Shared by `execute_audit_app_registrations` and `execute_run_posture_scan` so both
+    can access the raw, structured findings instead of only the formatted text summary.
+    """
     raw_apps = await graph_client.get_app_registrations()
     all_issues: list[SecurityIssue] = []
 
@@ -25,9 +26,11 @@ async def execute_audit_app_registrations(
         )
         all_issues.extend(issues)
 
-    # Update Resource cache
-    update_latest_scan_cache([i.model_dump() for i in all_issues])
+    return all_issues
 
+
+def format_app_registration_summary(all_issues: list[SecurityIssue]) -> str:
+    """Formats app registration findings into the human-readable tool summary text."""
     if not all_issues:
         return "Audit complete: No app registration security issues detected."
 
@@ -38,3 +41,25 @@ async def execute_audit_app_registrations(
         )
 
     return "\n".join(summary_lines)
+
+
+async def execute_audit_app_registrations(
+    imminent_expiry_days: int = 30,
+    excessive_lifespan_days: int = 180,
+    graph_client: EntraGraphClient | None = None,
+) -> str:
+    """Scans Entra ID app registrations for expiring secrets, risky scopes, and redirect URIs."""
+    if graph_client is None:
+        graph_client = get_shared_graph_client()
+
+    all_issues = await fetch_app_registration_issues(
+        imminent_expiry_days, excessive_lifespan_days, graph_client
+    )
+
+    update_latest_scan_cache(
+        "app_registration_issues",
+        [i.model_dump() for i in all_issues],
+        tenant_id=graph_client.auth_handler.tenant_id,
+    )
+
+    return format_app_registration_summary(all_issues)

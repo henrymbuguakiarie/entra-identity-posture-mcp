@@ -1,22 +1,36 @@
 import json
-from datetime import UTC
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 
-# Global in-memory cache for the latest scan results
+ScanCategory = Literal["app_registration_issues", "conditional_access_issues"]
+
+# Global in-memory cache for the latest combined scan results across both scan types.
 _LATEST_SCAN_CACHE: dict[str, Any] = {
     "status": "no_scans_run",
-    "timestamp": None,
-    "issues": [],
+    "last_updated": None,
+    "tenant_id": None,
+    "app_registration_issues": [],
+    "conditional_access_issues": [],
 }
 
 
-def update_latest_scan_cache(issues: list[dict[str, Any]]) -> None:
-    """Updates the in-memory scan cache with latest findings."""
-    from datetime import datetime
+def update_latest_scan_cache(
+    category: ScanCategory,
+    issues: list[dict[str, Any]],
+    tenant_id: str | None = None,
+) -> None:
+    """Updates one category of the in-memory scan cache with the latest findings.
 
+    Both `audit_app_registrations` and `scan_conditional_access_gaps` call this with
+    their own category so the combined `entra://posture/latest` resource always
+    reflects the most recent findings from each scan type, instead of only the
+    last scan that happened to run.
+    """
     _LATEST_SCAN_CACHE["status"] = "completed"
-    _LATEST_SCAN_CACHE["timestamp"] = datetime.now(UTC).isoformat()
-    _LATEST_SCAN_CACHE["issues"] = issues
+    _LATEST_SCAN_CACHE["last_updated"] = datetime.now(UTC).isoformat()
+    _LATEST_SCAN_CACHE[category] = issues
+    if tenant_id is not None:
+        _LATEST_SCAN_CACHE["tenant_id"] = tenant_id
 
 
 def get_latest_scan_json() -> str:

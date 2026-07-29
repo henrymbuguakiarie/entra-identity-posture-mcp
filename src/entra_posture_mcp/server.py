@@ -1,3 +1,5 @@
+from typing import Literal
+
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
@@ -12,6 +14,7 @@ from entra_posture_mcp.tools.generate_remediation_plan import (
 from entra_posture_mcp.tools.revoke_or_disable_app_registration import (
     execute_revoke_or_disable_app_registration,
 )
+from entra_posture_mcp.tools.run_posture_scan import execute_run_posture_scan
 from entra_posture_mcp.tools.scan_conditional_access_gaps import (
     execute_scan_conditional_access_gaps,
 )
@@ -45,6 +48,27 @@ async def scan_conditional_access_gaps() -> str:
 
 
 @mcp.tool()
+async def run_posture_scan(
+    imminent_expiry_days: int = 30,
+    excessive_lifespan_days: int = 180,
+    severity: str | None = None,
+    rule_id: str | None = None,
+    app_id: str | None = None,
+) -> str:
+    """Runs the app registration and Conditional Access scans concurrently and
+    returns one combined, optionally filtered posture summary. Updates the
+    shared entra://posture/latest resource cache with both scan categories.
+    """
+    return await execute_run_posture_scan(
+        imminent_expiry_days=imminent_expiry_days,
+        excessive_lifespan_days=excessive_lifespan_days,
+        severity=severity,
+        rule_id=rule_id,
+        app_id=app_id,
+    )
+
+
+@mcp.tool()
 async def generate_remediation_plan(issues: list[dict]) -> str:
     """Generates a Zero-Trust Markdown security report and dry-run CLI
     remediation commands from findings.
@@ -55,7 +79,7 @@ async def generate_remediation_plan(issues: list[dict]) -> str:
 @mcp.tool()
 async def revoke_or_disable_app_registration(
     app_id: str,
-    action: str,
+    action: Literal["disable_sign_in", "remove_credential", "remove_permission"],
     key_id: str | None = None,
 ) -> str:
     """Generates dry-run Azure CLI or PowerShell commands to disable sign-in
@@ -64,7 +88,7 @@ async def revoke_or_disable_app_registration(
     return await execute_revoke_or_disable_app_registration(
         app_id=app_id,
         action=action,
-        key_id=key_id,  # type: ignore
+        key_id=key_id,
     )
 
 

@@ -17,6 +17,8 @@ HIGH_RISK_GRAPH_PERMISSIONS = {
 
 MULTI_TENANT_AUDIENCES = {"AzureADMultipleOrgs", "AzureADandPersonalMicrosoftAccount"}
 
+RULE_VERSION = "1.1"
+
 
 def evaluate_app_registration_rules(
     app: AppRegistration,
@@ -50,6 +52,7 @@ def evaluate_app_registration_rules(
                         app_name=app.display_name,
                         severity="HIGH",
                         rule_id="IMMINENT_EXPIRATION",
+                        rule_version=RULE_VERSION,
                         issue=(
                             f"Credential key_id '{cred.key_id}' expires in "
                             f"{days_until_expiry} days."
@@ -61,6 +64,13 @@ def evaluate_app_registration_rules(
                             "# Azure CLI: Rotate secret\n"
                             f"az ad app credential reset --id {app.app_id}"
                         ),
+                        evidence={
+                            "key_id": cred.key_id,
+                            "days_until_expiry": days_until_expiry,
+                            "end_date_time": end_dt.isoformat(),
+                        },
+                        remediation_action="remove_credential",
+                        remediation_params={"app_id": app.app_id, "key_id": cred.key_id},
                     )
                 )
 
@@ -84,6 +94,7 @@ def evaluate_app_registration_rules(
                         app_name=app.display_name,
                         severity="MEDIUM",
                         rule_id="EXCESSIVE_LIFESPAN",
+                        rule_version=RULE_VERSION,
                         issue=(
                             f"Credential key_id '{cred.key_id}' has an excessive "
                             f"lifespan of {total_lifespan_days} days."
@@ -97,6 +108,14 @@ def evaluate_app_registration_rules(
                             f"az ad app credential delete --id {app.app_id} "
                             f"--key-id {cred.key_id}"
                         ),
+                        evidence={
+                            "key_id": cred.key_id,
+                            "lifespan_days": total_lifespan_days,
+                            "start_date_time": start_dt.isoformat(),
+                            "end_date_time": end_dt.isoformat(),
+                        },
+                        remediation_action="remove_credential",
+                        remediation_params={"app_id": app.app_id, "key_id": cred.key_id},
                     )
                 )
 
@@ -123,6 +142,7 @@ def evaluate_app_registration_rules(
                 app_name=app.display_name,
                 severity=severity,
                 rule_id="HIGH_RISK_PERMISSIONS",
+                rule_version=RULE_VERSION,
                 issue=issue_msg,
                 recommendation=(
                     "Remove unneeded administrative permissions and apply "
@@ -133,6 +153,12 @@ def evaluate_app_registration_rules(
                     f"# Review and update permissions for App Object ID: {app.id}\n"
                     f"Update-MgApplication -ApplicationId {app.id}"
                 ),
+                evidence={
+                    "scopes": found_high_risk_scopes,
+                    "sign_in_audience": app.sign_in_audience,
+                },
+                remediation_action="remove_permission",
+                remediation_params={"app_id": app.id},
             )
         )
 
@@ -145,6 +171,7 @@ def evaluate_app_registration_rules(
                 app_name=app.display_name,
                 severity="HIGH",
                 rule_id="DANGEROUS_REDIRECT_URI",
+                rule_version=RULE_VERSION,
                 issue=f"Insecure redirect URIs detected: {', '.join(risky_uris)}.",
                 recommendation=("Enforce HTTPS for all redirect URIs and remove wildcards."),
                 remediation_command=(
@@ -152,6 +179,7 @@ def evaluate_app_registration_rules(
                     f"Update-MgApplication -ApplicationId {app.id} -Web "
                     "@{{ RedirectUris = @('https://your-secure-domain/callback') }}"
                 ),
+                evidence={"redirect_uris": risky_uris},
             )
         )
 

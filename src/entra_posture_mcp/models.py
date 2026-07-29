@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -13,10 +13,42 @@ class SecurityIssue(BaseModel):
         ..., description="Severity level."
     )
     rule_id: str = Field(..., description="The unique identifier of the rule that was violated.")
+    rule_version: str = Field(
+        default="1.0", description="Version of the rule definition that produced this finding."
+    )
     issue: str = Field(..., description="A brief description of the security issue.")
     recommendation: str = Field(..., description="Recommended action to remediate the issue.")
     remediation_command: str | None = Field(
         default=None, description="Command or steps to remediate the issue."
+    )
+    evidence: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Structured evidence backing the finding (e.g. key_id, policy id, scopes).",
+    )
+    remediation_action: (
+        Literal["disable_sign_in", "remove_credential", "remove_permission"] | None
+    ) = Field(
+        default=None,
+        description="The action to pass to revoke_or_disable_app_registration, if applicable.",
+    )
+    remediation_params: dict[str, str] = Field(
+        default_factory=dict,
+        description="Parameters to pass to revoke_or_disable_app_registration with the action.",
+    )
+
+
+class ScanMetadata(BaseModel):
+    """Metadata describing when and against which tenant a scan was run."""
+
+    tenant_id: str | None = Field(
+        default=None, description="Directory (tenant) ID the scan was run against."
+    )
+    scanned_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        description="UTC timestamp when the scan completed.",
+    )
+    rule_version: str = Field(
+        default="1.0", description="Version of the rule set used to generate findings."
     )
 
 

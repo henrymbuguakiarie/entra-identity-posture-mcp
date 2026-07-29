@@ -10,6 +10,10 @@ async def execute_revoke_or_disable_app_registration(
     if action == "disable_sign_in":
         cmd = (
             "# PowerShell (MgGraph): Disable user sign-in\n"
+            "# NOTE: -ServicePrincipalId expects the Service Principal's object ID,\n"
+            "# not the application (client) ID. If app_id below is a client ID,\n"
+            "# resolve it first, e.g.:\n"
+            f"# (Get-MgServicePrincipal -Filter \"appId eq '{app_id}'\").Id\n"
             f"Update-MgServicePrincipal -ServicePrincipalId {app_id} -AccountEnabled:$false"
         )
     elif action == "remove_credential":

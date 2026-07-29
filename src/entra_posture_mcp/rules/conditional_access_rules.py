@@ -6,6 +6,8 @@ HIGH_PRIVILEGE_ADMIN_ROLES = {
     "e8611ab8-c189-46e8-94e1-60213ab1f814": "Privileged Role Administrator",
 }
 
+RULE_VERSION = "1.1"
+
 
 def evaluate_conditional_access_rules(
     policy: ConditionalAccessPolicy,
@@ -21,6 +23,7 @@ def evaluate_conditional_access_rules(
                 app_name=policy.display_name,
                 severity="MEDIUM",
                 rule_id="CA_REPORT_ONLY_MODE",
+                rule_version=RULE_VERSION,
                 issue=(
                     f"Conditional Access policy '{policy.display_name}' is in Report-Only mode."
                 ),
@@ -34,6 +37,7 @@ def evaluate_conditional_access_rules(
                     "Update-MgIdentityConditionalAccessPolicy "
                     f"-ConditionalAccessPolicyId '{policy.id}' -State 'enabled'"
                 ),
+                evidence={"policy_id": policy.id, "state": policy.state},
             )
         )
 
@@ -51,6 +55,7 @@ def evaluate_conditional_access_rules(
                 app_name=policy.display_name,
                 severity="CRITICAL",
                 rule_id="CA_ADMIN_MFA_EXCLUSION",
+                rule_version=RULE_VERSION,
                 issue=(
                     f"Policy excludes privileged admin roles ({', '.join(flagged_roles)}) "
                     "from enforcement."
@@ -64,6 +69,7 @@ def evaluate_conditional_access_rules(
                     "Get-MgIdentityConditionalAccessPolicy "
                     f"-ConditionalAccessPolicyId '{policy.id}'"
                 ),
+                evidence={"policy_id": policy.id, "excluded_roles": flagged_roles},
             )
         )
 
