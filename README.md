@@ -234,7 +234,7 @@ uv run entra-posture-mcp
 | Tool     | `scan_conditional_access_gaps`       | Scans Conditional Access policies for admin MFA exclusions and report-only status. Returns structured findings plus a text `summary`                                              |
 | Tool     | `run_posture_scan`                   | Runs both scans above concurrently and returns one merged, optionally severity/rule/app-filtered result. Updates both cache categories                                            |
 | Tool     | `generate_remediation_plan`          | Renders a Markdown Zero-Trust report + dry-run CLI/PowerShell snippets from findings                                                                                              |
-| Tool     | `revoke_or_disable_app_registration` | Generates a dry-run Azure CLI/PowerShell command to disable sign-in, rotate or remove a credential, or remove a permission                                                        |
+| Tool     | `revoke_or_disable_app_registration` | Generates a dry-run Azure CLI/PowerShell command to disable sign-in, rotate a password or certificate credential (type-specific), remove a credential, or remove a permission     |
 | Resource | `entra://posture/latest`             | Cached JSON from the most recent scan of each category (app registrations, Conditional Access), queryable without re-invoking a tool                                              |
 | Prompt   | `security_triage_prompt`             | Predefined Zero-Trust triage prompt to prioritize findings and recommend fixes                                                                                                    |
 
@@ -282,6 +282,18 @@ MCP clients talk to the server over stdio using [JSON-RPC 2.0](https://www.jsonr
 
 The MCP Inspector CLI commands in [step 6](#6-verify-the-server) print just the `result` payload — reproduce the raw envelope above by driving the server directly with the [MCP Python SDK client](https://github.com/modelcontextprotocol/python-sdk), or watch stdin/stdout while a client like Claude Desktop or VS Code Copilot Chat drives it.
 
+`revoke_or_disable_app_registration`'s `action` argument distinguishes password vs. certificate credentials, so the generated command matches the credential type flagged by a scan finding's `evidence.credential_type`:
+
+```jsonc
+// action: "rotate_password_credential"
+"az ad app credential reset --id abc-123 --append"
+
+// action: "rotate_certificate_credential"
+"az ad app credential reset --id abc-123 --append --create-cert"
+```
+
+`--append` is always included — it adds a new credential alongside existing ones for zero-downtime rotation, instead of the Azure CLI's destructive default of clearing all existing credentials.
+
 ### Example agent workflow
 
 ```
@@ -321,7 +333,7 @@ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
 
 Once you configure `.env` against a real test tenant, run the stdio entrypoint and invoke `audit_app_registrations` / `scan_conditional_access_gaps` / `run_posture_scan` to confirm known findings (an expiring secret, a risky permission, or a report-only Conditional Access policy) surface correctly — then repeat the workflow through Claude Desktop or VS Code Copilot Chat using the configs above.
 
-> Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant/app IDs redacted). Scan tools return structured `metadata` + `issues` alongside a `summary` text field — shown below trimmed to the first finding and the summary for brevity:
+> Live MCP Inspector CLI session against a real test tenant, captured verbatim (tenant/app IDs redacted). Scan tools return structured `metadata` + `issues` alongside a `summary` text field — shown below trimmed to the first/last finding for brevity. Note `evidence.credential_type` (`"certificate"` or `"password"`) on the `EXCESSIVE_LIFESPAN` finding, which drives which of `rotate_password_credential` / `rotate_certificate_credential` a matching `IMMINENT_EXPIRATION` finding would recommend:
 >
 > ```console
 > $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name audit_app_registrations
@@ -329,7 +341,7 @@ Once you configure `.env` against a real test tenant, run the stdio entrypoint a
 >   "content": [
 >     {
 >       "type": "text",
->       "text": "{\n  \"metadata\": {\n    \"tenant_id\": \"248c1b45-...\",\n    \"scanned_at\": \"2026-07-29T09:10:26.662088Z\",\n    \"rule_version\": \"1.1\"\n  },\n  \"issues\": [\n    {\n      \"app_id\": \"fd0486bd-...\",\n      \"app_name\": \"InsomniaWebApp\",\n      \"severity\": \"HIGH\",\n      \"rule_id\": \"DANGEROUS_REDIRECT_URI\",\n      \"issue\": \"Insecure redirect URIs detected: http://localhost.\",\n      \"evidence\": {\"redirect_uris\": [\"http://localhost\"]},\n      \"remediation_action\": null,\n      ... 5 more issues ...\n    }\n  ],\n  \"summary\": \"Found 6 app registration security issues:\\n\\n- [HIGH] InsomniaWebApp (fd0486bd-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] web-api-4 (f7272057-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] web-app-calls-web-api-2 (5847db6c-...): Insecure redirect URIs detected: http://localhost.\\n- [HIGH] identity-web-app (5cad77dc-...): Insecure redirect URIs detected: http://localhost.\\n- [MEDIUM] entra-identity-posture-mcp (c712c7f1-...): Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\\n- [HIGH] identity-web-app-v1 (eadcc84d-...): Insecure redirect URIs detected: http://localhost.\"\n}"
+>       "text": "{\n  \"metadata\": {\n    \"tenant_id\": \"248c1b45-...\",\n    \"scanned_at\": \"2026-07-29T09:35:26.482128Z\",\n    \"rule_version\": \"1.1\"\n  },\n  \"issues\": [\n    {\n      \"app_id\": \"fd0486bd-...\",\n      \"app_name\": \"InsomniaWebApp\",\n      \"severity\": \"HIGH\",\n      \"rule_id\": \"DANGEROUS_REDIRECT_URI\",\n      \"issue\": \"Insecure redirect URIs detected: http://localhost.\",\n      \"evidence\": {\"redirect_uris\": [\"http://localhost\"]},\n      \"remediation_action\": null,\n      ... 3 more DANGEROUS_REDIRECT_URI findings ...\n    },\n    {\n      \"app_id\": \"c712c7f1-...\",\n      \"app_name\": \"entra-identity-posture-mcp\",\n      \"severity\": \"MEDIUM\",\n      \"rule_id\": \"EXCESSIVE_LIFESPAN\",\n      \"issue\": \"Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\",\n      \"evidence\": {\"key_id\": \"5e44aaeb-...\", \"credential_type\": \"certificate\", \"lifespan_days\": 365},\n      \"remediation_action\": \"remove_credential\",\n      \"remediation_params\": {\"app_id\": \"c712c7f1-...\", \"key_id\": \"5e44aaeb-...\"}\n    }\n  ],\n  \"summary\": \"Found 6 app registration security issues:\\n\\n- [HIGH] InsomniaWebApp (fd0486bd-...): Insecure redirect URIs detected: http://localhost.\\n... 4 more ...\\n- [MEDIUM] entra-identity-posture-mcp (c712c7f1-...): Credential key_id '5e44aaeb-...' has an excessive lifespan of 365 days.\"\n}"
 >     }
 >   ],
 >   "isError": false
@@ -344,6 +356,33 @@ Once you configure `.env` against a real test tenant, run the stdio entrypoint a
 >     }
 >   ],
 >   "isError": false
+> }
+>
+> $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp --method tools/call --tool-name run_posture_scan
+> {
+>   "content": [
+>     {
+>       "type": "text",
+>       "text": "{\n  \"metadata\": {\n    \"tenant_id\": \"248c1b45-...\",\n    \"scanned_at\": \"2026-07-29T09:24:31.284144Z\",\n    \"rule_version\": \"app:1.1;ca:1.1\"\n  },\n  \"issues\": [ ... 6 combined app-registration + Conditional Access findings ... ],\n  \"summary\": \"Found 6 posture issues (of 6 total): ...\"\n}"
+>     }
+>   ],
+>   "isError": false
+> }
+> ```
+>
+> `severity` is a Pydantic `Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]` at the MCP schema boundary, so an invalid value on `run_posture_scan` fails validation before the scan runs — it never silently returns zero results:
+>
+> ```console
+> $ npx @modelcontextprotocol/inspector --cli uv run entra-posture-mcp \
+>     --method tools/call --tool-name run_posture_scan --tool-arg severity=NOT_A_LEVEL
+> {
+>   "content": [
+>     {
+>       "type": "text",
+>       "text": "Error executing tool run_posture_scan: 1 validation error for run_posture_scanArguments\nseverity\n  Input should be 'CRITICAL', 'HIGH', 'MEDIUM' or 'LOW' [type=literal_error, input_value='NOT_A_LEVEL', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error"
+>     }
+>   ],
+>   "isError": true
 > }
 > ```
 >
