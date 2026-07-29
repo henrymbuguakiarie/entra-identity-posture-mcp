@@ -171,3 +171,17 @@ def get_shared_graph_client() -> EntraGraphClient:
     if _shared_graph_client is None:
         _shared_graph_client = EntraGraphClient(auth_handler=EntraAuthHandler())
     return _shared_graph_client
+
+
+async def aclose_shared_graph_client() -> None:
+    """Closes the shared `EntraGraphClient`, if one was ever created.
+
+    Unlike calling `get_shared_graph_client().aclose()`, this does NOT construct
+    a new client (and its `EntraAuthHandler`, which requires tenant/client
+    credentials) just to close it — safe to call unconditionally on shutdown,
+    including in environments with no Graph credentials configured (e.g. CI).
+    """
+    global _shared_graph_client
+    if _shared_graph_client is not None:
+        await _shared_graph_client.aclose()
+        _shared_graph_client = None

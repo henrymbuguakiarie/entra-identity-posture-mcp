@@ -4,7 +4,7 @@ from typing import Literal
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from entra_posture_mcp.graph_client import get_shared_graph_client
+from entra_posture_mcp.graph_client import aclose_shared_graph_client
 from entra_posture_mcp.models import PostureScanResult
 from entra_posture_mcp.prompts import get_security_triage_prompt
 from entra_posture_mcp.resources import get_latest_scan_json
@@ -27,11 +27,16 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(_server: FastMCP):
-    """Closes the shared Graph HTTP client's connection pool on server shutdown."""
+    """Closes the shared Graph HTTP client's connection pool on server shutdown.
+
+    Only closes a client that was actually created during this server's
+    lifetime — never forces creation of one (which would require Graph
+    credentials) just to immediately close it.
+    """
     try:
         yield
     finally:
-        await get_shared_graph_client().aclose()
+        await aclose_shared_graph_client()
 
 
 mcp = FastMCP("Entra Identity Posture Guard", lifespan=lifespan)
